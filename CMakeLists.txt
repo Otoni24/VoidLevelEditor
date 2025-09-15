@@ -34,8 +34,8 @@ FetchContent_Declare(ImGui-SFML
 FetchContent_MakeAvailable(ImGui-SFML)
 
 add_executable(VoidLevelEditor
-    "VoidLevelEditor.cpp"
-)
+    
+ "src/main.cpp")
 
 target_compile_features(VoidLevelEditor PRIVATE cxx_std_17)
 target_link_libraries(VoidLevelEditor PRIVATE VectorizerLib SFML::Graphics ImGui-SFML::ImGui-SFML)
