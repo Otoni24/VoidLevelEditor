@@ -1,7 +1,9 @@
 #include <iostream>
+#include "core/Application.h"
 
 int main()
 {
-	std::cout << "Hello CMake." << std::endl;
+	Application app;
+	app.Run();
 	return 0;
 }

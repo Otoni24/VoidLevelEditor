@@ -12,19 +12,22 @@ FetchContent_Declare(
     GIT_SHALLOW ON
 )
 FetchContent_MakeAvailable(VectorizerLib)
+
 FetchContent_Declare(SFML
     GIT_REPOSITORY https://github.com/SFML/SFML.git
     GIT_TAG 3.0.1
     GIT_SHALLOW ON
     )
 FetchContent_MakeAvailable(SFML)
+
 FetchContent_Declare(ImGui
     GIT_REPOSITORY https://github.com/ocornut/imgui
-    GIT_TAG v1.91.1
+    GIT_TAG v1.91.1-docking
     GIT_SHALLOW ON
     )
 FetchContent_MakeAvailable(ImGui)
 FetchContent_GetProperties(ImGui SOURCE_DIR IMGUI_DIR)
+
 set(IMGUI_SFML_FIND_SFML OFF)
 FetchContent_Declare(ImGui-SFML
     GIT_REPOSITORY https://github.com/SFML/imgui-sfml
@@ -35,7 +38,13 @@ FetchContent_MakeAvailable(ImGui-SFML)
 
 add_executable(VoidLevelEditor
     
- "src/main.cpp")
+    "src/main.cpp"
+    "src/core/Application.cpp"
+    "src/level/LevelUtils.cpp"
+    "src/level/AssetManager.cpp"
+    "lib/ImGuiFileDialog/ImGuiFileDialog.cpp"
+)
 
+target_include_directories(VoidLevelEditor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/lib/ImGuiFileDialog)
 target_compile_features(VoidLevelEditor PRIVATE cxx_std_17)
-target_link_libraries(VoidLevelEditor PRIVATE VectorizerLib SFML::Graphics ImGui-SFML::ImGui-SFML)
+target_link_libraries(VoidLevelEditor PRIVATE VectorizerLib SFML::Graphics ImGui-SFML::ImGui-SFML )
