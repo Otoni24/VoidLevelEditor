@@ -189,7 +189,12 @@ void Application::RenderLevelPopup()
 			ImGui::SameLine();
 			if (ImGui::Button("Browse Files"))
 			{
-				ImGuiFileDialog::Instance()->OpenDialog("ChooseBGFileDlgKey", "Choose Level Texture", ".png,.jpg,.jpeg");
+				ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_Always);
+				ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, { 0.5f, 0.5f });
+				IGFD::FileDialogConfig config;
+				config.path = ".";
+				config.flags = ImGuiFileDialogFlags_Modal;
+				ImGuiFileDialog::Instance()->OpenDialog("ChooseBGFileDlgKey", "Choose Level Texture", ".png,.jpg,.jpeg", config);
 			}
 			if (ImGuiFileDialog::Instance()->Display("ChooseBGFileDlgKey", ImGuiWindowFlags_Modal))
 			{
@@ -213,7 +218,12 @@ void Application::RenderLevelPopup()
 			ImGui::SameLine();
 			if (ImGui::Button("Browse Files##Hitbox"))
 			{
-				ImGuiFileDialog::Instance()->OpenDialog("ChooseHBFileDlgKey", "Choose Hitbox Texture Map", ".png");
+				ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_Always);
+				ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, { 0.5f, 0.5f });
+				IGFD::FileDialogConfig config;
+				config.path = ".";
+				config.flags = ImGuiFileDialogFlags_Modal;
+				ImGuiFileDialog::Instance()->OpenDialog("ChooseHBFileDlgKey", "Choose Hitbox Texture Map", ".png", config);
 			}
 			if (ImGuiFileDialog::Instance()->Display("ChooseHBFileDlgKey", ImGuiWindowFlags_Modal))
 			{
