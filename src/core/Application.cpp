@@ -54,7 +54,6 @@ void Application::Tick(sf::Time deltaTime)
 	if (!mProjectInitialized && mWizardState == LevelWizardState::Idle)
 	{
 		mWizardState = LevelWizardState::Selection;
-		ImGui::OpenPopup("Create or Load Level");
 	}
 	if (mWizardState != LevelWizardState::Idle)
 	{
@@ -68,27 +67,12 @@ void Application::Tick(sf::Time deltaTime)
 			break;
 		}
 		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, { 0.5f, 0.5f });
+		ImGui::OpenPopup("Create or Load Level");
 	}
 
 	if (ImGui::BeginPopupModal("Create or Load Level", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize))
 	{
 		RenderLevelPopup();
-		if (ImGuiFileDialog::Instance()->Display("ChooseBGFileDlgKey", ImGuiFileDialogFlags_Modal))
-		{
-			if (ImGuiFileDialog::Instance()->IsOk()) {
-				mBackgroundPath = ImGuiFileDialog::Instance()->GetFilePathName();
-			}
-			ImGuiFileDialog::Instance()->Close();
-		}
-
-		if (ImGuiFileDialog::Instance()->Display("ChooseHBFileDlgKey"))
-		{
-			if (ImGuiFileDialog::Instance()->IsOk()) {
-				mHitboxPath = ImGuiFileDialog::Instance()->GetFilePathName();
-			}
-			ImGuiFileDialog::Instance()->Close();
-		}
-		ImGui::EndPopup();
 	}
 
 	RenderEditorUI();
@@ -205,17 +189,19 @@ void Application::RenderLevelPopup()
 			ImGui::SameLine();
 			if (ImGui::Button("Browse Files"))
 			{
-				// 1. Crea un oggetto di configurazione
-				IGFD::FileDialogConfig config;
+				ImGuiFileDialog::Instance()->OpenDialog("ChooseBGFileDlgKey", "Choose Level Texture", ".png,.jpg,.jpeg");
+			}
+			if (ImGuiFileDialog::Instance()->Display("ChooseBGFileDlgKey", ImGuiWindowFlags_Modal))
+			{
+				// Se l'utente ha premuto "Ok"
+				if (ImGuiFileDialog::Instance()->IsOk())
+				{
+					// Ottieni il percorso del file selezionato
+					mBackgroundPath = ImGuiFileDialog::Instance()->GetFilePathName();
+				}
 
-				// 2. Imposta il path iniziale se vuoi (opzionale)
-				config.path = ".";
-
-				// 3. IMPOSTA LA FLAG FONDAMENTALE
-				config.flags = ImGuiFileDialogFlags_Modal;
-
-				// 4. Passa la configurazione a OpenDialog
-				ImGuiFileDialog::Instance()->OpenDialog("ChooseBGFileDlgKey", "Choose Level Texture", ".png,.jpg,.jpeg", config);
+				// Chiudi il dialog
+				ImGuiFileDialog::Instance()->Close();
 			}
 		}
 		ImGui::Separator();
@@ -228,6 +214,18 @@ void Application::RenderLevelPopup()
 			if (ImGui::Button("Browse Files##Hitbox"))
 			{
 				ImGuiFileDialog::Instance()->OpenDialog("ChooseHBFileDlgKey", "Choose Hitbox Texture Map", ".png");
+			}
+			if (ImGuiFileDialog::Instance()->Display("ChooseHBFileDlgKey", ImGuiWindowFlags_Modal))
+			{
+				// Se l'utente ha premuto "Ok"
+				if (ImGuiFileDialog::Instance()->IsOk())
+				{
+					// Ottieni il percorso del file selezionato
+					mHitboxPath = ImGuiFileDialog::Instance()->GetFilePathName();
+				}
+
+				// Chiudi il dialog
+				ImGuiFileDialog::Instance()->Close();
 			}
 		}
 		{
@@ -253,4 +251,6 @@ void Application::RenderLevelPopup()
 		}
 		break;
 	}
+
+	ImGui::EndPopup();
 }
