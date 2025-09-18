@@ -4,7 +4,6 @@
 
 struct Asset
 {
-	//sprite
 	std::string name;
-	sf::Texture texture;
+	std::string texturePath;
 };

@@ -41,9 +41,9 @@ add_executable(VoidLevelEditor
     "src/main.cpp"
     "src/core/Application.cpp"
     "src/level/LevelUtils.cpp"
-    "src/level/AssetManager.cpp"
+    "src/project/AssetManager.cpp"
     "lib/ImGuiFileDialog/ImGuiFileDialog.cpp"
-)
+ "src/project/Project.h")
 
 target_include_directories(VoidLevelEditor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/lib/ImGuiFileDialog)
 target_compile_features(VoidLevelEditor PRIVATE cxx_std_17)

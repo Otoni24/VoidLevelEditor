@@ -4,12 +4,19 @@
 #include <imgui-SFML.h>
 #include <SFML/Graphics.hpp>
 #include "level/Level.h"
+#include "core/Utils.h"
+#include "project/Project.h"
 
-enum class LevelWizardState {
+enum class ProjectWizardState {
 	Idle, // Nessuna azione
 	Selection,  // Mostra "Nuovo/Carica"
-	LoadLevel, 
-	CreateLevel   // Mostra la configurazione del nuovo progetto
+	LoadProject, 
+	CreateProject   // Mostra la configurazione del nuovo progetto
+};
+
+struct AssetCreationInfo {
+	std::string name;
+	std::string texturePath;
 };
 
 class Application
@@ -22,10 +29,14 @@ public:
 private:
 	virtual void Tick(sf::Time deltaTime);
 	virtual void Render();
+	virtual void RenderUI(sf::Time deltaTime);
 	void SetupDefaultDockingLayout(ImGuiID nodeID);
 	void RenderScene();
 	void RenderEditorUI();
-	void RenderLevelPopup();
+	void RenderAssetLibraryUI();
+	void RenderWizardUI();
+	void RenderCreateProject();
+	void LoadProjectTextures();
 
 	sf::RenderWindow mWindow;
 	sf::Clock mTickClock;
@@ -39,9 +50,13 @@ private:
 	float mCleanCycleInterval;
 	bool mIsFirstFrame;
 	bool mProjectInitialized;
-	LevelWizardState mWizardState;
+	ProjectWizardState mWizardState;
 	std::string mBackgroundPath;
 	std::string mHitboxPath;
 	bool mEnableHitboxCreation;
 	int mHitboxSimplifyValue;
+	List<AssetCreationInfo> mCreationTempAssets;
+	Project mTempSetupProject;
+	Project mProject;
+	std::string mBackgroundTextureID;
 };
