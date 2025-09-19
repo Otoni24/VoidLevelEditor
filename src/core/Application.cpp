@@ -12,16 +12,12 @@ Application::Application()
 	mCleanCycleInterval{},
 	mIsFirstFrame{ true },
 	mLevelCanvas({ 800, 600 }),
-	mLevel{},
+	mLevelView({0.f,0.f}, {1920.f, 1080.f}),
 	mProjectInitialized{ false },
 	mWizardState{ ProjectWizardState::Idle },
-	mBackgroundPath{ "" },
-	mHitboxPath{ "" },
-	mEnableHitboxCreation{ false },
-	mHitboxSimplifyValue{ 3 },
-	mCreationTempAssets{ },
 	mTempSetupProject{},
-	mBackgroundTextureID{"VoidBGID"}
+	mBackgroundTextureID{"VoidBGID"},
+	mSelectedGameObject{nullptr}
 {
 	mWindow.setVerticalSyncEnabled(true);
 	ImGui::SFML::Init(mWindow);
@@ -50,6 +46,7 @@ void Application::Run()
 		Render();
 	}
 }
+
 void Application::Tick(sf::Time deltaTime)
 {
 	RenderUI(deltaTime);
@@ -59,6 +56,8 @@ void Application::Tick(sf::Time deltaTime)
 
 void Application::Render()
 {
+	mLevelCanvas.setView(mLevelView);
+
 	RenderScene();
 
 	mWindow.clear(sf::Color(30, 30, 30));
@@ -73,34 +72,13 @@ void Application::RenderScene()
 	if (backgroundTexture)
 	{
 		sf::Sprite backgroundSprite(*backgroundTexture);
-
-		sf::Vector2f canvasSize = sf::Vector2f(mLevelCanvas.getSize());
-		sf::Vector2f textureSize = sf::Vector2f(backgroundTexture->getSize());
-
-		if (textureSize.x > 0 && textureSize.y > 0)
-		{
-			float scale = 1.0f;
-			sf::Vector2f position(0.f, 0.f);
-
-			float canvasRatio = canvasSize.x / canvasSize.y;
-			float textureRatio = textureSize.x / textureSize.y;
-
-			if (canvasRatio > textureRatio)
-			{
-				scale = canvasSize.y / textureSize.y;
-				position.x = (canvasSize.x - textureSize.x * scale) * 0.5f;
-			}
-			else
-			{
-				scale = canvasSize.x / textureSize.x;
-				position.y = (canvasSize.y - textureSize.y * scale) * 0.5f;
-			}
-			backgroundSprite.setScale({ scale, scale });
-			backgroundSprite.setPosition(position);
-
-			mLevelCanvas.draw(backgroundSprite);
-		}
+		mLevelCanvas.draw(backgroundSprite);
 	}
+	for (const unique<GameObject>& gameObject : mProject.level.gameObjects)
+	{
+		mLevelCanvas.draw(gameObject->sprite);
+	}
+
 	mLevelCanvas.display();
 }
 
@@ -163,21 +141,14 @@ void Application::RenderEditorUI()
 
 	ImGui::Begin("Level Viewport");
 
-	ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
-	sf::Vector2u currentCanvasSize = mLevelCanvas.getSize();
-	if (currentCanvasSize.x != viewportPanelSize.x || currentCanvasSize.y != viewportPanelSize.y)
-	{
-		if (viewportPanelSize.x > 0 && viewportPanelSize.y > 0)
-		{
-			mLevelCanvas.resize({ static_cast<unsigned int>(viewportPanelSize.x), static_cast<unsigned int>(viewportPanelSize.y) });
-		}
-	}
-
-	ImGui::Image(mLevelCanvas);
+	RenderLevelCanvasUI();
 
 	ImGui::End();
 
 	ImGui::Begin("Properties");
+
+	RenderPropertiesUI();
+
 	ImGui::End();
 
 	ImGui::Begin("Asset Library");
@@ -185,47 +156,6 @@ void Application::RenderEditorUI()
 	RenderAssetLibraryUI();
 
 	ImGui::End();
-}
-
-void Application::RenderAssetLibraryUI()
-{
-	List<Asset> assets = mProject.assets;
-
-	ImGuiStyle& style = ImGui::GetStyle();
-	float windowVisible_x2 = ImGui::GetWindowPos().x + ImGui::GetContentRegionAvail().x;
-	float thumbnailSize = 80.0f;
-	float padding = style.ItemSpacing.x;
-
-	for (const Asset asset : assets)
-	{
-		ImGui::PushID(asset.name.c_str());
-		ImGui::BeginGroup();
-		sf::Texture ciao = {};
-		{
-			if (ImGui::ImageButton("##Asset", *AssetManager::Get().GetTexture(asset.name), sf::Vector2f{thumbnailSize, thumbnailSize}))
-			{
-				LOG("Clicked asset: %s", asset.name.c_str());
-			}
-
-			if (ImGui::BeginDragDropSource())
-			{
-				ImGui::SetDragDropPayload("ASSET_PAYLOAD", asset.name.c_str(), asset.name.length() + 1);
-				ImGui::Image(*AssetManager::Get().GetTexture(asset.name), sf::Vector2f{32, 32});
-
-				ImGui::EndDragDropSource();
-			}
-
-			ImGui::TextWrapped("%s", asset.name.c_str());
-		}
-		ImGui::EndGroup();
-		float lastItem_x2 = ImGui::GetItemRectMax().x;
-		float nextItem_x1 = lastItem_x2 + padding;
-		if (nextItem_x1 + thumbnailSize < windowVisible_x2)
-		{
-			ImGui::SameLine();
-		}
-		ImGui::PopID();
-	}
 }
 
 void Application::RenderWizardUI()
@@ -340,15 +270,15 @@ void Application::RenderCreateProject()
 	if (ImGui::BeginChild("AssetList", ImVec2(0, 250), ImGuiChildFlags_Borders))
 	{
 		int asset_to_delete = -1;
-		for (int i = 0; i < mTempSetupProject.assets.size(); ++i)
+		for (int i = 0; i < mTempAssetList.size(); ++i)
 		{
 			ImGui::PushID(i);
 			ImGui::PushItemWidth(210);
-			ImGui::InputTextWithHint("##AssetName", "Object Name (as in game file)", &mTempSetupProject.assets[i].name);
+			ImGui::InputTextWithHint("##AssetName", "Object Name (as in game file)", &mTempAssetList[i].name);
 			ImGui::PopItemWidth();
 			ImGui::SameLine();
 			ImGui::PushItemWidth(415);
-			ImGui::InputTextWithHint("##AssetPath", "Sprite Path", &mTempSetupProject.assets[i].texturePath, ImGuiInputTextFlags_ReadOnly);
+			ImGui::InputTextWithHint("##AssetPath", "Sprite Path", &mTempAssetList[i].texturePath, ImGuiInputTextFlags_ReadOnly);
 			ImGui::PopItemWidth();
 			ImGui::SameLine();
 
@@ -368,7 +298,7 @@ void Application::RenderCreateProject()
 				if (ImGuiFileDialog::Instance()->IsOk())
 				{
 					// Ottieni il percorso del file selezionato
-					mTempSetupProject.assets[i].texturePath = ImGuiFileDialog::Instance()->GetFilePathName();
+					mTempAssetList[i].texturePath = ImGuiFileDialog::Instance()->GetFilePathName();
 				}
 
 				// Chiudi il dialog
@@ -385,12 +315,12 @@ void Application::RenderCreateProject()
 		}
 
 		if (asset_to_delete != -1) {
-			mTempSetupProject.assets.erase(mTempSetupProject.assets.begin() + asset_to_delete);
+			mTempAssetList.erase(mTempAssetList.begin() + asset_to_delete);
 		}
 
 		if (ImGui::Button("Add Asset"))
 		{
-			mTempSetupProject.assets.emplace_back();
+			mTempAssetList.emplace_back();
 		}
 
 		ImGui::EndChild();
@@ -400,6 +330,10 @@ void Application::RenderCreateProject()
 	if (ImGui::Button("Create Project")) {
 		mProjectInitialized = true;
 		mWizardState = ProjectWizardState::Idle;
+		for (const AssetData assetData : mTempAssetList) {
+			if (assetData.name.empty()) continue;
+			mTempSetupProject.assets[assetData.name] = assetData;
+		}
 		mProject = std::move(mTempSetupProject);
 		LoadProjectTextures();
 		ImGui::CloseCurrentPopup();
@@ -410,12 +344,159 @@ void Application::RenderCreateProject()
 	}
 }
 
+void Application::RenderLevelCanvasUI()
+{
+	sf::Vector2u newCanvasSize = ImGui::GetContentRegionAvail();
+
+	if (mLevelCanvas.getSize() != newCanvasSize)
+	{
+		mLevelCanvas.resize(newCanvasSize);
+	}
+
+	sf::Vector2f viewSize = mLevelView.getSize();
+	float windowRatio = (float)newCanvasSize.x / (float)newCanvasSize.y;
+	float viewRatio = viewSize.x / viewSize.y;
+
+	float sizeX = 1.0f;
+	float sizeY = 1.0f;
+	float posX = 0.0f;
+	float posY = 0.0f;
+
+	if (windowRatio > viewRatio)
+	{
+		sizeX = viewRatio / windowRatio;
+		posX = (1.0f - sizeX) / 2.0f;
+	}
+	else
+	{
+		sizeY = windowRatio / viewRatio;
+		posY = (1.0f - sizeY) / 2.0f;
+	}
+	mLevelView.setViewport(sf::FloatRect({ posX, posY }, { sizeX, sizeY }));
+
+	ImGui::Image(mLevelCanvas);
+
+	sf::Vector2i viewportMousePos{ sf::Vector2f(ImGui::GetMousePos()) - sf::Vector2f(ImGui::GetItemRectMin()) };
+	sf::Vector2f levelMousePos = mLevelCanvas.mapPixelToCoords(viewportMousePos, mLevelView);
+
+	if (ImGui::BeginDragDropTarget())
+	{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("ASSET_PAYLOAD"))
+		{
+			const char* nameCharID = (const char*)payload->Data;
+			std::string nameID(nameCharID);
+
+			const auto& asset = mProject.assets.at(nameID);
+
+			const sf::Texture* gameObjectTexture = AssetManager::Get().GetTexture(nameID);
+			if (gameObjectTexture)
+			{
+				sf::Sprite gameObjectSprite(*gameObjectTexture);
+				GameObject newObject(nameID, gameObjectSprite);
+				newObject.sprite.setPosition(levelMousePos);
+				newObject.sprite.setScale(asset.defaultScale);
+				newObject.sprite.setRotation(asset.defaultRotation);
+				newObject.sprite.setOrigin(sf::Vector2f{ gameObjectTexture->getSize().x / 2.f, gameObjectTexture->getSize().y / 2.f });
+				mProject.level.gameObjects.push_back(std::make_unique<GameObject>(newObject));
+			}
+		}
+
+		ImGui::EndDragDropTarget();
+	}
+	if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+	{
+		List<unique<GameObject>>& gameObjects = mProject.level.gameObjects;
+		for (auto object = gameObjects.rbegin(); object!= gameObjects.rend(); ++object)
+		{
+			if (object->get()->sprite.getGlobalBounds().contains(levelMousePos))
+			{
+				mSelectedGameObject = object->get();
+				mSelectedAssetID.reset();
+				std::rotate((object+1).base(), object.base(), gameObjects.end());
+			}
+		}
+	}
+
+}
+
+void Application::RenderPropertiesUI()
+{
+	if (mSelectedGameObject)
+	{
+		ImGui::Text("Position");
+		sf::Vector2f position = mSelectedGameObject->sprite.getPosition();
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x/2 - ImGui::GetStyle().ItemSpacing.x);
+		if (ImGui::InputFloat("##pos_x_input", &position.x)) {
+			mSelectedGameObject->sprite.setPosition(position);
+		}
+
+		ImGui::SameLine();
+
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x);
+		if (ImGui::InputFloat("##pos_y_input", &position.y)) {
+			mSelectedGameObject->sprite.setPosition(position);
+		}
+		ImGui::PopItemWidth();
+		ImGui::Separator();
+
+		
+	}
+	else if (mSelectedAssetID.has_value())
+	{
+
+	}
+}
+
+void Application::RenderAssetLibraryUI()
+{
+	Map<std::string, Asset> assets = mProject.assets;
+
+	ImGuiStyle& style = ImGui::GetStyle();
+	float windowVisible_x2 = ImGui::GetWindowPos().x + ImGui::GetContentRegionAvail().x;
+	float thumbnailSize = 80.0f;
+	float padding = style.ItemSpacing.x;
+
+	for (const auto& pair : assets)
+	{
+		ImGui::PushID(pair.first.c_str());
+		ImGui::BeginGroup();
+		{
+			if (ImGui::ImageButton("##Asset", *AssetManager::Get().GetTexture(pair.first), sf::Vector2f{ thumbnailSize, thumbnailSize }))
+			{
+				mSelectedAssetID = pair.first;
+				mSelectedGameObject = nullptr;
+			}
+
+			if (ImGui::BeginDragDropSource())
+			{
+				ImGui::SetDragDropPayload("ASSET_PAYLOAD", pair.first.c_str(), pair.first.length() + 1);
+				ImGui::Image(*AssetManager::Get().GetTexture(pair.first), sf::Vector2f{32, 32});
+
+				ImGui::EndDragDropSource();
+			}
+
+			ImGui::TextWrapped("%s", pair.first.c_str());
+		}
+		ImGui::EndGroup();
+		float lastItem_x2 = ImGui::GetItemRectMax().x;
+		float nextItem_x1 = lastItem_x2 + padding;
+		if (nextItem_x1 + thumbnailSize < windowVisible_x2)
+		{
+			ImGui::SameLine();
+		}
+		ImGui::PopID();
+	}
+}
+
 void Application::LoadProjectTextures()
 {
-	for (Asset asset : mProject.assets)
+	for (const auto& assetPair : mProject.assets)
 	{
-		AssetManager::Get().LoadTexture(asset.name, asset.texturePath);
+		AssetManager::Get().LoadTexture(assetPair.first, assetPair.second.texturePath);
 	}
 	AssetManager::Get().LoadTexture(mBackgroundTextureID, mProject.backgroundTexturePath);
+	sf::Vector2f backgroundSize = sf::Vector2f(AssetManager::Get().GetTexture(mBackgroundTextureID)->getSize());
+	mLevelView.setSize(backgroundSize);
+	mLevelView.setCenter(backgroundSize / 2.f);
 }
 

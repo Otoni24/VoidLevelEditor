@@ -33,6 +33,8 @@ private:
 	void SetupDefaultDockingLayout(ImGuiID nodeID);
 	void RenderScene();
 	void RenderEditorUI();
+	void RenderLevelCanvasUI();
+	void RenderPropertiesUI();
 	void RenderAssetLibraryUI();
 	void RenderWizardUI();
 	void RenderCreateProject();
@@ -45,18 +47,17 @@ private:
 	sf::RenderTexture mLevelCanvas;
 	sf::View mLevelView;
 
-	Level mLevel;
 
 	float mCleanCycleInterval;
 	bool mIsFirstFrame;
 	bool mProjectInitialized;
 	ProjectWizardState mWizardState;
-	std::string mBackgroundPath;
-	std::string mHitboxPath;
-	bool mEnableHitboxCreation;
-	int mHitboxSimplifyValue;
-	List<AssetCreationInfo> mCreationTempAssets;
 	Project mTempSetupProject;
+	List<AssetData> mTempAssetList;
 	Project mProject;
 	std::string mBackgroundTextureID;
+	sf::Vector2f mTempObjectPos;
+
+	GameObject* mSelectedGameObject;
+	std::optional<std::string> mSelectedAssetID;
 };

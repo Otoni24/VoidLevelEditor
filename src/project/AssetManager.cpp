@@ -11,7 +11,7 @@ AssetManager& AssetManager::Get()
 	return *assetManager;
 }
 
-bool AssetManager::LoadTexture(std::string& name, std::string& path)
+bool AssetManager::LoadTexture(const std::string& name,const std::string& path)
 {
 	if (mLoadedTextures.count(name))
 	{

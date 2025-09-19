@@ -6,5 +6,8 @@
 struct GameObject
 {
 	std::string assetID;
-	sf::Vector2f position;
+	sf::Sprite sprite;
+	GameObject(std::string inputAssetID, sf::Sprite inputSprite)
+		: assetID{ inputAssetID }, sprite{ inputSprite }
+	{ }
 };

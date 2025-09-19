@@ -13,13 +13,10 @@ struct Project
 	std::string hitboxTexturePath;
 	int simplifyIndex;
 	bool bHitboxMap;
-	List<Asset> assets;
-	void addAsset(Asset asset)
-	{
-		assets.push_back(asset);
-	}
+	Map<std::string, Asset> assets;
 	Project()
-		: simplifyIndex{3},
-		bHitboxMap{false}
-	{}
+		: simplifyIndex{ 3 },
+		bHitboxMap{ false }
+	{
+	}
 };

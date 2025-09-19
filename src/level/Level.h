@@ -7,9 +7,9 @@
 struct Level
 {
 	Vectorizer::Math::Chain hitBoxChain;
-	List<GameObject> gameObjects;
-	void addGameObject(GameObject object)
+	List<unique<GameObject>> gameObjects;
+	void addGameObject(std::unique_ptr<GameObject> object)
 	{
-		gameObjects.push_back(object);
+		gameObjects.push_back(std::move(object));
 	}
 };
