@@ -11,6 +11,7 @@ FetchContent_Declare(
     GIT_TAG "master"
     GIT_SHALLOW ON
 )
+set(VEC_IMPLEMENT_STB_IMAGE OFF)
 FetchContent_MakeAvailable(VectorizerLib)
 
 FetchContent_Declare(SFML
@@ -36,6 +37,13 @@ FetchContent_Declare(ImGui-SFML
     )
 FetchContent_MakeAvailable(ImGui-SFML)
 
+FetchContent_Declare(nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.12.0
+    GIT_SHALLOW ON
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 add_executable(VoidLevelEditor
     
     "src/main.cpp"
@@ -43,8 +51,8 @@ add_executable(VoidLevelEditor
     "src/level/LevelUtils.cpp"
     "src/project/AssetManager.cpp"
     "lib/ImGuiFileDialog/ImGuiFileDialog.cpp"
- "src/project/Project.h")
+ )
 
 target_include_directories(VoidLevelEditor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/lib/ImGuiFileDialog)
 target_compile_features(VoidLevelEditor PRIVATE cxx_std_17)
-target_link_libraries(VoidLevelEditor PRIVATE VectorizerLib SFML::Graphics ImGui-SFML::ImGui-SFML )
+target_link_libraries(VoidLevelEditor PRIVATE VectorizerLib SFML::Graphics ImGui-SFML::ImGui-SFML nlohmann_json::nlohmann_json)

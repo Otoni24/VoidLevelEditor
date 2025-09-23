@@ -1,5 +1,7 @@
 #include "AssetManager.h"
 
+using namespace vle;
+
 std::unique_ptr<AssetManager> AssetManager::assetManager = nullptr;
 AssetManager& AssetManager::Get()
 {
@@ -39,4 +41,13 @@ const sf::Texture* AssetManager::GetTexture(const std::string& name) const
 bool AssetManager::RemoveTexture(const std::string& name)
 {
 	return mLoadedTextures.erase(name) > 0;
+}
+
+bool AssetManager::Clear()
+{
+	for (auto it = mLoadedTextures.begin(); it!=mLoadedTextures.end();)
+	{
+		it = mLoadedTextures.erase(it);
+	}
+	return true;
 }

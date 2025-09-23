@@ -4,12 +4,14 @@
 #include "GameObject.h"
 #include "core/Utils.h"
 
-struct Level
-{
-	Vectorizer::Math::Chain hitBoxChain;
-	List<unique<GameObject>> gameObjects;
-	void addGameObject(std::unique_ptr<GameObject> object)
+namespace vle {
+	struct Level
 	{
-		gameObjects.push_back(std::move(object));
-	}
-};
+		List<sf::VertexArray> hitboxMap;
+		List<unique<GameObject>> gameObjects;
+		void addGameObject(unique<GameObject> object)
+		{
+			gameObjects.push_back(std::move(object));
+		}
+	};
+}

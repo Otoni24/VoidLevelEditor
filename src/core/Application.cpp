@@ -5,6 +5,8 @@
 #include "core/Utils.h"
 #include "project/AssetManager.h"
 
+using namespace vle;
+
 Application::Application()
 	: mWindow{ sf::VideoMode({1000, 680}), "Level Editor", sf::Style::Default },
 	mTickClock{},
@@ -17,7 +19,10 @@ Application::Application()
 	mWizardState{ ProjectWizardState::Idle },
 	mTempSetupProject{},
 	mBackgroundTextureID{"VoidBGID"},
-	mSelectedGameObject{nullptr}
+	mSelectedGameObject{nullptr},
+	mMissingBackgroundPath{false},
+	mMissingHitboxPath{false},
+	mShowHitboxes{false}
 {
 	mWindow.setVerticalSyncEnabled(true);
 	ImGui::SFML::Init(mWindow);
@@ -78,6 +83,38 @@ void Application::RenderScene()
 	{
 		mLevelCanvas.draw(gameObject->sprite);
 	}
+	if (mSelectedGameObject != nullptr)
+	{
+		sf::Transform  transform = mSelectedGameObject->sprite.getTransform();
+		sf::FloatRect bounds = mSelectedGameObject->sprite.getLocalBounds();
+		sf::Vector2f topL = bounds.position;
+		sf::Vector2f topR = { topL.x + bounds.size.x, topL.y };
+		sf::Vector2f botL = { topL.x, topL.y + bounds.size.y };
+		sf::Vector2f botR = topL + bounds.size;
+		sf::VertexArray selectionRect(sf::PrimitiveType::LineStrip);
+		selectionRect.append(sf::Vertex{ transform.transformPoint(topL), sf::Color::Yellow });
+		selectionRect.append(sf::Vertex{ transform.transformPoint(topR), sf::Color::Yellow });
+		selectionRect.append(sf::Vertex{ transform.transformPoint(botR), sf::Color::Yellow });
+		selectionRect.append(sf::Vertex{ transform.transformPoint(botL), sf::Color::Yellow });
+		selectionRect.append(sf::Vertex{ transform.transformPoint(topL), sf::Color::Yellow });
+		mLevelCanvas.draw(selectionRect);
+	}
+	if (mShowHitboxes)
+	{
+		const sf::Texture* backgroundTexture = AssetManager::Get().GetTexture(mBackgroundTextureID);
+		if (backgroundTexture)
+		{
+			sf::Vector2f backgroundSize = sf::Vector2f(backgroundTexture->getSize());
+			sf::RectangleShape hitboxBackground;
+			hitboxBackground.setSize(backgroundSize);
+			hitboxBackground.setFillColor(sf::Color(10, 10, 10, 200));
+			mLevelCanvas.draw(hitboxBackground);
+			for (sf::VertexArray chain : mProject.level.hitboxMap)
+			{
+				mLevelCanvas.draw(chain);
+			}
+		}
+	}
 
 	mLevelCanvas.display();
 }
@@ -104,12 +141,15 @@ void Application::SetupDefaultDockingLayout(ImGuiID nodeID)
 	ImGuiID dock_main_id = nodeID;
 	ImGuiID dock_bottom_id;
 	ImGuiID dock_right_id;
-	ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.3f, &dock_bottom_id, &dock_main_id);
+	ImGuiID dock_right_bottom_id;
 	ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.3f, &dock_right_id, &dock_main_id);
+	ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.3f, &dock_bottom_id, &dock_main_id);
+	ImGui::DockBuilderSplitNode(dock_right_id, ImGuiDir_Down, 0.5f, &dock_right_bottom_id, &dock_right_id);
 
 	ImGui::DockBuilderDockWindow("Asset Library", dock_bottom_id);
-	ImGui::DockBuilderDockWindow("Properties", dock_right_id);
+	ImGui::DockBuilderDockWindow("Game Objects", dock_right_id);
 	ImGui::DockBuilderDockWindow("Level Viewport", dock_main_id);
+	ImGui::DockBuilderDockWindow("Properties", dock_right_bottom_id);
 
 	ImGui::DockBuilderFinish(nodeID);
  }
@@ -127,6 +167,12 @@ void Application::RenderEditorUI()
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+	ImGui::BeginMainMenuBar();
+
+	RenderMainMenuBarUI();
+
+	ImGui::EndMainMenuBar();
 
 	ImGui::Begin("DockSpace Host", nullptr, window_flags);
 
@@ -156,6 +202,56 @@ void Application::RenderEditorUI()
 	RenderAssetLibraryUI();
 
 	ImGui::End();
+
+	ImGui::Begin("Game Objects");
+
+	RenderGameObjectsUI();
+
+	ImGui::End();
+}
+
+void Application::RenderMainMenuBarUI()
+{
+	if (ImGui::BeginMenu("File"))
+	{
+		if (ImGui::MenuItem("New Project"))
+		{
+			mTempSetupProject = Project();
+			mTempAssetList.clear();
+			mSelectedAssetID.reset();
+			mSelectedGameObject = nullptr;
+			mWizardState = ProjectWizardState::CreateProject;
+			mProjectInitialized = false;
+		}
+		if (ImGui::MenuItem("Open Project"))
+		{
+
+		}
+		if (ImGui::MenuItem("Edit Project"))
+		{
+			mSelectedAssetID.reset();
+			mSelectedGameObject = nullptr;
+			mTempSetupProject = std::move(mProject);
+			mWizardState = ProjectWizardState::CreateProject;
+			mProjectInitialized = false;
+		}
+		if (ImGui::MenuItem("Save Project"))
+		{
+
+		}
+		if (ImGui::MenuItem("Export Level"))
+		{
+
+		}
+		ImGui::EndMenu();
+	}
+
+	if (ImGui::BeginMenu("View"))
+	{
+		ImGui::MenuItem("View Hitboxes", 0, &mShowHitboxes);
+
+		ImGui::EndMenu();
+	}
 }
 
 void Application::RenderWizardUI()
@@ -328,20 +424,90 @@ void Application::RenderCreateProject()
 
 	ImGui::Separator();
 	if (ImGui::Button("Create Project")) {
-		mProjectInitialized = true;
-		mWizardState = ProjectWizardState::Idle;
-		for (const AssetData assetData : mTempAssetList) {
-			if (assetData.name.empty()) continue;
-			mTempSetupProject.assets[assetData.name] = assetData;
+		if (ProjectInitialization()) {
+			mWizardState = ProjectWizardState::Idle;
+			ImGui::CloseCurrentPopup();
 		}
-		mProject = std::move(mTempSetupProject);
-		LoadProjectTextures();
-		ImGui::CloseCurrentPopup();
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Back")) {
 		mWizardState = ProjectWizardState::Selection; // Torna allo stato precedente
 	}
+	ImGui::SameLine();
+	if (mMissingBackgroundPath)
+	{
+		ImVec4 redColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+		ImGui::TextColored(redColor, "%s", "Missing Background Path");
+	}
+	ImGui::SameLine();
+	if (mMissingHitboxPath)
+	{
+		ImVec4 redColor = ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
+		ImGui::TextColored(redColor, "%s", "Missing Hitbox Map Path, input a path or remove the checkbox");
+	}
+}
+
+bool Application::ProjectInitialization()
+{
+	if (mTempSetupProject.backgroundTexturePath == "")
+	{
+		mMissingBackgroundPath = true;
+		return false;
+	}
+	mMissingBackgroundPath = false;
+	mTempSetupProject.assets.clear();
+	for (const AssetData assetData : mTempAssetList) {
+		if (assetData.name.empty()) continue;
+		mTempSetupProject.assets[assetData.name] = std::make_unique<Asset>(assetData);
+	}
+	if (mTempSetupProject.bHitboxMap)
+	{
+		if (mTempSetupProject.hitboxTexturePath == "")
+		{
+			mMissingHitboxPath = true;
+			return false;
+		}
+		mMissingHitboxPath = false;
+		List<Vectorizer::Math::Chain> chains = Vectorizer::vectorizeImage(mTempSetupProject.hitboxTexturePath, mTempSetupProject.simplifyIndex);
+		for (Vectorizer::Math::Chain chain : chains)
+		{
+			sf::VertexArray newChain(sf::PrimitiveType::LineStrip);
+			for (Vectorizer::Math::Point point : chain)
+			{
+				sf::Vertex newPoint{ { point.x, point.y } };
+				newChain.append(newPoint);
+			}
+			mTempSetupProject.level.hitboxMap.push_back(newChain);
+		}
+	}
+	mProjectInitialized = true;
+	mProject = std::move(mTempSetupProject);
+	LoadProjectTextures();
+	for (auto it = mProject.level.gameObjects.begin(); it != mProject.level.gameObjects.end(); )
+	{
+		GameObject* object = it->get();
+		if (mProject.assets.count(object->assetID) == 0)
+		{
+			it = mProject.level.gameObjects.erase(it);
+		}
+		else
+		{
+			const sf::Texture* texture = AssetManager::Get().GetTexture(object->assetID);
+			if (texture)
+			{
+				object->sprite.setTexture(*texture, true);
+			}
+			it++;
+		}
+	}
+	const sf::Texture* backgroundTexture = AssetManager::Get().GetTexture(mBackgroundTextureID);
+	if (backgroundTexture)
+	{
+		sf::Vector2f backgroundSize = sf::Vector2f(backgroundTexture->getSize());
+		mLevelView.setSize(backgroundSize);
+		mLevelView.setCenter(backgroundSize / 2.f);
+	}
+	return true;
 }
 
 void Application::RenderLevelCanvasUI()
@@ -386,7 +552,7 @@ void Application::RenderLevelCanvasUI()
 			const char* nameCharID = (const char*)payload->Data;
 			std::string nameID(nameCharID);
 
-			const auto& asset = mProject.assets.at(nameID);
+			const Asset* asset = mProject.assets.at(nameID).get();
 
 			const sf::Texture* gameObjectTexture = AssetManager::Get().GetTexture(nameID);
 			if (gameObjectTexture)
@@ -394,26 +560,46 @@ void Application::RenderLevelCanvasUI()
 				sf::Sprite gameObjectSprite(*gameObjectTexture);
 				GameObject newObject(nameID, gameObjectSprite);
 				newObject.sprite.setPosition(levelMousePos);
-				newObject.sprite.setScale(asset.defaultScale);
-				newObject.sprite.setRotation(asset.defaultRotation);
+				newObject.sprite.setScale(asset->defaultScale);
+				newObject.sprite.setRotation(asset->defaultRotation);
 				newObject.sprite.setOrigin(sf::Vector2f{ gameObjectTexture->getSize().x / 2.f, gameObjectTexture->getSize().y / 2.f });
 				mProject.level.gameObjects.push_back(std::make_unique<GameObject>(newObject));
+				mSelectedGameObject = mProject.level.gameObjects.back().get();
 			}
 		}
 
 		ImGui::EndDragDropTarget();
 	}
-	if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+	if (ImGui::IsItemHovered())
 	{
-		List<unique<GameObject>>& gameObjects = mProject.level.gameObjects;
-		for (auto object = gameObjects.rbegin(); object!= gameObjects.rend(); ++object)
+		if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 		{
-			if (object->get()->sprite.getGlobalBounds().contains(levelMousePos))
+			List<unique<GameObject>>& gameObjects = mProject.level.gameObjects;
+			for (auto object = gameObjects.rbegin(); object != gameObjects.rend(); ++object)
 			{
-				mSelectedGameObject = object->get();
-				mSelectedAssetID.reset();
-				std::rotate((object+1).base(), object.base(), gameObjects.end());
+				if (object->get()->sprite.getGlobalBounds().contains(levelMousePos))
+				{
+					mSelectedGameObject = object->get();
+					mSelectedAssetID.reset();
+					mDraggingObject = true;
+					break;
+				}
+				mSelectedGameObject = nullptr;
 			}
+		}
+		if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+		{
+			mDraggingObject = false;
+		}
+		if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && mDraggingObject)
+		{
+			ImVec2 mouseDeltaPixels = ImGui::GetIO().MouseDelta;
+			sf::Vector2i currentMousePosPixel = sf::Vector2i(ImGui::GetMousePos()) - sf::Vector2i(ImGui::GetItemRectMin());
+			sf::Vector2i prevMousePosPixel = currentMousePosPixel - sf::Vector2i(mouseDeltaPixels);
+			sf::Vector2f currentMousePosWorld = mLevelCanvas.mapPixelToCoords(currentMousePosPixel, mLevelView);
+			sf::Vector2f prevMousePosWorld = mLevelCanvas.mapPixelToCoords(prevMousePosPixel, mLevelView);
+			sf::Vector2f worldDelta = currentMousePosWorld - prevMousePosWorld;
+			mSelectedGameObject->sprite.move(worldDelta);
 		}
 	}
 
@@ -423,64 +609,233 @@ void Application::RenderPropertiesUI()
 {
 	if (mSelectedGameObject)
 	{
+		RenderGameObjectPropertiesUI();
+	}
+	else if (mSelectedAssetID.has_value())
+	{
+		RenderAssetPropertiesUI();
+	}
+}
+
+void Application::RenderGameObjectPropertiesUI()
+{
+	const float PI = 3.1415926535f;
+	{
 		ImGui::Text("Position");
+		ImGui::Text("x:");
+		ImGui::SameLine();
 		sf::Vector2f position = mSelectedGameObject->sprite.getPosition();
-		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x/2 - ImGui::GetStyle().ItemSpacing.x);
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 2 - ImGui::GetStyle().ItemSpacing.x);
 		if (ImGui::InputFloat("##pos_x_input", &position.x)) {
 			mSelectedGameObject->sprite.setPosition(position);
 		}
 
 		ImGui::SameLine();
 
+		ImGui::Text("y:");
+		ImGui::SameLine();
 		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x);
 		if (ImGui::InputFloat("##pos_y_input", &position.y)) {
 			mSelectedGameObject->sprite.setPosition(position);
 		}
 		ImGui::PopItemWidth();
-		ImGui::Separator();
-
-		
 	}
-	else if (mSelectedAssetID.has_value())
-	{
 
+	ImGui::Separator();
+
+	{
+		ImGui::Text("Scale");
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 2 - ImGui::GetStyle().ItemSpacing.x);
+		sf::Vector2f scale = mSelectedGameObject->sprite.getScale();
+		if (ImGui::InputFloat("##scale_input", &scale.x)) {
+			mSelectedGameObject->sprite.setScale({ scale.x,scale.x });
+		}
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x);
+		if (ImGui::SliderFloat("##scale_slider", &scale.x, 0.f, 10.f)) {
+			mSelectedGameObject->sprite.setScale({ scale.x,scale.x });
+		}
+	}
+
+	ImGui::Separator();
+
+	{
+		ImGui::Text("Rotation");
+		float rotation = mSelectedGameObject->sprite.getRotation().asDegrees();
+		if (rotation > 180.f)
+		{
+			rotation -= 360.f;
+		}
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 2 - ImGui::GetStyle().ItemSpacing.x);
+		if (ImGui::InputFloat("##rot_input", &rotation)) {
+			mSelectedGameObject->sprite.setRotation(sf::degrees(rotation));
+		}
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		float rotationRad = mSelectedGameObject->sprite.getRotation().asRadians();
+		if (rotationRad > PI)
+		{
+			rotationRad -= 2 * PI;
+		}
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x);
+		if (ImGui::SliderAngle("##rot_slider", &rotationRad, -180.f, 180.f)) {
+			mSelectedGameObject->sprite.setRotation(sf::radians(rotationRad));
+		}
+		ImGui::PopItemWidth();
+	}
+
+	ImGui::Separator();
+
+	{
+		auto it = std::find_if(mProject.level.gameObjects.begin(), mProject.level.gameObjects.end(),
+			[this](const std::unique_ptr<GameObject>& ptr) {
+				return ptr.get() == mSelectedGameObject;
+			});
+		if (ImGui::Button("Put in Front", { ImGui::GetContentRegionAvail().x , 0 }))
+		{
+			std::rotate(it, it+1, mProject.level.gameObjects.end());
+		}
+	}
+}
+
+void Application::RenderAssetPropertiesUI()
+{
+	const float PI = 3.1415926535f;
+	Asset* asset = mProject.assets.at(mSelectedAssetID.value()).get();
+	{
+		ImGui::Text("Scale");
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 2 - ImGui::GetStyle().ItemSpacing.x);
+		if (ImGui::InputFloat("##scale_input", &asset->defaultScale.x)) {
+			asset->defaultScale.y = asset->defaultScale.x;
+		}
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+		if (ImGui::SliderFloat("##scale_slider", &asset->defaultScale.x, 0.f, 10.f)) {
+			asset->defaultScale.y = asset->defaultScale.x;
+		}
+		ImGui::PopItemWidth();
+		if (ImGui::Button("Apply Scale to Instances", { ImGui::GetContentRegionAvail().x , 0 }))
+		{
+			for (unique<GameObject>& gameObjectUnique : mProject.level.gameObjects)
+			{
+				GameObject* gameObject = gameObjectUnique.get();
+				if (gameObject->assetID == mSelectedAssetID)
+				{
+					gameObject->sprite.setScale(asset->defaultScale);
+				}
+			}
+			
+		}
+	}
+
+	ImGui::Separator();
+
+	{
+		ImGui::Text("Rotation");
+		float rotation = asset->defaultRotation.asDegrees();
+		if (rotation > 180.f)
+		{
+			rotation -= 360.f;
+		}
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 2 - ImGui::GetStyle().ItemSpacing.x);
+		if (ImGui::InputFloat("##rot_input", &rotation)) {
+			asset->defaultRotation = sf::degrees(rotation);
+		}
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+		float rotationRad = asset->defaultRotation.asRadians();
+		if (rotationRad > PI)
+		{
+			rotationRad -= 2 * PI;
+		}
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+		if (ImGui::SliderAngle("##rot_slider", &rotationRad, -180.f, 180.f)) {
+			asset->defaultRotation = sf::radians(rotationRad);
+		}
+		ImGui::PopItemWidth();
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+		if (ImGui::Button("Apply Rotation to Instances", { ImGui::GetContentRegionAvail().x , 0 }))
+		{
+			for (unique<GameObject>& gameObjectUnique : mProject.level.gameObjects)
+			{
+				GameObject* gameObject = gameObjectUnique.get();
+				if (gameObject->assetID == mSelectedAssetID)
+				{
+					gameObject->sprite.setRotation(asset->defaultRotation);
+				}
+			}
+
+		}
+		ImGui::PopItemWidth();
 	}
 }
 
 void Application::RenderAssetLibraryUI()
 {
-	Map<std::string, Asset> assets = mProject.assets;
+	Map<std::string, unique<Asset>>& assets = mProject.assets;
 
 	ImGuiStyle& style = ImGui::GetStyle();
 	float windowVisible_x2 = ImGui::GetWindowPos().x + ImGui::GetContentRegionAvail().x;
-	float thumbnailSize = 80.0f;
+	sf::Vector2f thumbnailSize = { 80.0f, 80.f };
 	float padding = style.ItemSpacing.x;
 
 	for (const auto& pair : assets)
 	{
+		const sf::Texture* texture = AssetManager::Get().GetTexture(pair.first);
+		if (!texture)
+		{
+			continue;
+		}
+		sf::Sprite sprite(*texture);
 		ImGui::PushID(pair.first.c_str());
 		ImGui::BeginGroup();
 		{
-			if (ImGui::ImageButton("##Asset", *AssetManager::Get().GetTexture(pair.first), sf::Vector2f{ thumbnailSize, thumbnailSize }))
+			std::string assetName = pair.first;
+			ImVec2 thumbnailSize = { 80.0f, 80.0f };
+			ImVec2 cursorPos = ImGui::GetCursorScreenPos();
+
+			if (ImGui::Button("##assetButton", thumbnailSize))
 			{
-				mSelectedAssetID = pair.first;
+				mSelectedAssetID = assetName;
 				mSelectedGameObject = nullptr;
+			}
+
+			sf::Vector2f textureSize = sf::Vector2f(texture->getSize());
+			ImVec2 imageSize = thumbnailSize;
+			ImVec2 imagePos = cursorPos;
+
+			float textureRatio = textureSize.x / textureSize.y;
+			float widgetRatio = thumbnailSize.x / thumbnailSize.y;
+
+			if (textureRatio > widgetRatio) {
+				imageSize.y = thumbnailSize.x / textureRatio;
+				imagePos.y += (thumbnailSize.y - imageSize.y) * 0.5f;
+			}
+			else if (textureRatio < widgetRatio) {
+				imageSize.x = thumbnailSize.y * textureRatio;
+				imagePos.x += (thumbnailSize.x - imageSize.x) * 0.5f;
 			}
 
 			if (ImGui::BeginDragDropSource())
 			{
-				ImGui::SetDragDropPayload("ASSET_PAYLOAD", pair.first.c_str(), pair.first.length() + 1);
-				ImGui::Image(*AssetManager::Get().GetTexture(pair.first), sf::Vector2f{32, 32});
-
+				ImGui::SetDragDropPayload("ASSET_PAYLOAD", assetName.c_str(), assetName.length() + 1);
+				ImGui::Image(*texture, imageSize);
+				ImGui::Text("%s", assetName.c_str());
 				ImGui::EndDragDropSource();
 			}
 
-			ImGui::TextWrapped("%s", pair.first.c_str());
+			ImGui::SetCursorScreenPos({ imagePos.x + 0.1f * thumbnailSize.x, imagePos.y + 0.1f * thumbnailSize.y });
+			ImGui::Image(*texture, { imageSize.x * 0.8f, imageSize.y * 0.8f });
+
+			ImGui::SetCursorScreenPos({ cursorPos.x, cursorPos.y + thumbnailSize.y });
+			ImGui::TextWrapped("%s", assetName.c_str());
 		}
 		ImGui::EndGroup();
 		float lastItem_x2 = ImGui::GetItemRectMax().x;
 		float nextItem_x1 = lastItem_x2 + padding;
-		if (nextItem_x1 + thumbnailSize < windowVisible_x2)
+		if (nextItem_x1 + thumbnailSize.x < windowVisible_x2)
 		{
 			ImGui::SameLine();
 		}
@@ -488,15 +843,47 @@ void Application::RenderAssetLibraryUI()
 	}
 }
 
+void Application::RenderGameObjectsUI()
+{
+	int index = 0;
+	for (auto it = mProject.level.gameObjects.begin(); it != mProject.level.gameObjects.end(); )
+	{
+		ImGui::PushID(index);
+		GameObject* gameObject = it->get();
+		float buttonWidth = ImGui::GetContentRegionAvail().x - 20.f;
+		bool isSelected = false;
+		if (gameObject == mSelectedGameObject)
+		{
+			isSelected = true;
+		}
+		std::string label = (gameObject->assetID + "##game_object_list_item");
+		if (ImGui::Selectable(label.c_str(), isSelected, 0, { buttonWidth, 0 }))
+		{
+			mSelectedGameObject = gameObject;
+			mSelectedAssetID.reset();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("X"))
+		{
+			it = mProject.level.gameObjects.erase(it);
+			if (gameObject == mSelectedGameObject) mSelectedGameObject = nullptr;
+			++index;
+		}
+		else {
+			++it;
+			++index;
+		}
+		ImGui::PopID();
+	}
+}
+
 void Application::LoadProjectTextures()
 {
+	AssetManager::Get().Clear();
 	for (const auto& assetPair : mProject.assets)
 	{
-		AssetManager::Get().LoadTexture(assetPair.first, assetPair.second.texturePath);
+		AssetManager::Get().LoadTexture(assetPair.first, assetPair.second.get()->texturePath);
 	}
 	AssetManager::Get().LoadTexture(mBackgroundTextureID, mProject.backgroundTexturePath);
-	sf::Vector2f backgroundSize = sf::Vector2f(AssetManager::Get().GetTexture(mBackgroundTextureID)->getSize());
-	mLevelView.setSize(backgroundSize);
-	mLevelView.setCenter(backgroundSize / 2.f);
 }
 
