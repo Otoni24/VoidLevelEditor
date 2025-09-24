@@ -7,6 +7,8 @@ namespace vle {
 	{
 		std::string name;
 		std::string texturePath;
+		sf::Vector2f defaultScale;
+		sf::Angle defaultRotation;
 	};
 	struct Asset
 	{
@@ -17,14 +19,17 @@ namespace vle {
 		~Asset() = default;
 		Asset(const Asset&) = default;
 		explicit Asset(const AssetData& other)
-			: texturePath(other.texturePath)
+			: texturePath(other.texturePath),
+			defaultScale(other.defaultScale),
+			defaultRotation(other.defaultRotation)
 		{
 		}
 		Asset& operator=(const Asset&) = default;
 		Asset& operator=(const AssetData& other)
 		{
 			texturePath = other.texturePath;
-			defaultScale = { 1.0f, 1.0f };
+			defaultScale = other.defaultScale;
+			defaultRotation = other.defaultRotation;
 			return *this;
 		}
 	};

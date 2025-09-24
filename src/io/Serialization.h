@@ -140,24 +140,21 @@ namespace vle {
 	{
 		j = nlohmann::json{
 			{"assetID", object.assetID},
-			{"position", object.sprite.getPosition()},
-			{"scale", object.sprite.getScale()},
-			{"rotation", object.sprite.getRotation()},
-			{"origin", object.sprite.getOrigin()}
+			{"position", object.sprite->getPosition()},
+			{"scale", object.sprite->getScale()},
+			{"rotation", object.sprite->getRotation()},
+			{"origin", object.sprite->getOrigin()}
 		};
 	}
 	void from_json(const nlohmann::json& j, GameObject& object)
 	{
 		j.at("assetID").get_to(object.assetID);
-		const sf::Texture* texture = AssetManager::Get().GetTexture(object.assetID);
-		if (texture)
-		{
-			object.sprite.setTexture(*texture, true);
-			object.sprite.setPosition(j.at("position").get<sf::Vector2f>());
-			object.sprite.setScale(j.at("scale").get<sf::Vector2f>());
-			object.sprite.setRotation(j.at("rotation").get<sf::Angle>());
-			object.sprite.setOrigin(j.at("origin").get<sf::Vector2f>());
-		}
+		const sf::Texture texture;
+		object.sprite.emplace(texture);
+		object.sprite->setPosition(j.at("position").get<sf::Vector2f>());
+		object.sprite->setScale(j.at("scale").get<sf::Vector2f>());
+		object.sprite->setRotation(j.at("rotation").get<sf::Angle>());
+		object.sprite->setOrigin(j.at("origin").get<sf::Vector2f>());
 	}
 
 	void to_json(nlohmann::json& j, const Level& level)
@@ -188,7 +185,7 @@ namespace vle {
 		j.at("defaultRotation").get_to(asset.defaultRotation);
 	}
 
-	void to_json(nlohmann::json& j, Project& project)
+	void to_json(nlohmann::json& j, const Project& project)
 	{
 		j = nlohmann::json{
 			{"level", project.level},

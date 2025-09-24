@@ -40,6 +40,8 @@ namespace vle
 		void RenderScene();
 		void RenderEditorUI();
 		void RenderMainMenuBarUI();
+		void LoadProjectDialog();
+		void LoadProject();
 		void RenderLevelCanvasUI();
 		void RenderPropertiesUI();
 		void RenderGameObjectPropertiesUI();
@@ -50,6 +52,7 @@ namespace vle
 		void RenderCreateProject();
 		bool ProjectInitialization();
 		void LoadProjectTextures();
+		void AssignProjectTextures();
 
 		sf::RenderWindow mWindow;
 		sf::Clock mTickClock;

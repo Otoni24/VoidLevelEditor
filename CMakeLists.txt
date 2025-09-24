@@ -48,7 +48,7 @@ add_executable(VoidLevelEditor
     
     "src/main.cpp"
     "src/core/Application.cpp"
-    "src/level/LevelUtils.cpp"
+    "src/io/ImportExport.cpp"
     "src/project/AssetManager.cpp"
     "lib/ImGuiFileDialog/ImGuiFileDialog.cpp"
  )

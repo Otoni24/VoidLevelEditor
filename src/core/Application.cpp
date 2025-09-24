@@ -4,6 +4,7 @@
 #include "core/Application.h"
 #include "core/Utils.h"
 #include "project/AssetManager.h"
+#include "io/ImportExport.h"
 
 using namespace vle;
 
@@ -81,12 +82,15 @@ void Application::RenderScene()
 	}
 	for (const unique<GameObject>& gameObject : mProject.level.gameObjects)
 	{
-		mLevelCanvas.draw(gameObject->sprite);
+		if (gameObject->sprite.has_value())
+		{
+			mLevelCanvas.draw(gameObject->sprite.value());
+		}
 	}
 	if (mSelectedGameObject != nullptr)
 	{
-		sf::Transform  transform = mSelectedGameObject->sprite.getTransform();
-		sf::FloatRect bounds = mSelectedGameObject->sprite.getLocalBounds();
+		sf::Transform  transform = mSelectedGameObject->sprite->getTransform();
+		sf::FloatRect bounds = mSelectedGameObject->sprite->getLocalBounds();
 		sf::Vector2f topL = bounds.position;
 		sf::Vector2f topR = { topL.x + bounds.size.x, topL.y };
 		sf::Vector2f botL = { topL.x, topL.y + bounds.size.y };
@@ -129,6 +133,24 @@ void Application::RenderUI(sf::Time deltaTime)
 	}
 
 	RenderEditorUI();
+
+	if (ImGuiFileDialog::Instance()->Display("SavePrjFile", ImGuiCond_Always, { 500.f, 300.f }))
+	{
+		if (ImGuiFileDialog::Instance()->IsOk())
+		{
+			ImportExport::save(mProject, ImGuiFileDialog::Instance()->GetFilePathName());
+		}
+		ImGuiFileDialog::Instance()->Close();
+	}
+	if (ImGuiFileDialog::Instance()->Display("OpenPrjFile", ImGuiCond_Always, { 500.f, 300.f }))
+	{
+		if (ImGuiFileDialog::Instance()->IsOk())
+		{
+			LoadProject();
+		}
+		ImGuiFileDialog::Instance()->Close();
+	}
+
 }
 
 void Application::SetupDefaultDockingLayout(ImGuiID nodeID)
@@ -225,20 +247,33 @@ void Application::RenderMainMenuBarUI()
 		}
 		if (ImGui::MenuItem("Open Project"))
 		{
-
+			LoadProjectDialog();
 		}
+		
 		if (ImGui::MenuItem("Edit Project"))
 		{
 			mSelectedAssetID.reset();
 			mSelectedGameObject = nullptr;
+			mTempAssetList.clear();
 			mTempSetupProject = std::move(mProject);
+			for (const auto& pair : mTempSetupProject.assets) {
+				if (pair.second) {
+					const Asset& asset = *pair.second;
+					AssetData assetData{pair.first, asset.texturePath, asset.defaultScale, asset.defaultRotation};
+					mTempAssetList.push_back(assetData);
+				}
+			}
 			mWizardState = ProjectWizardState::CreateProject;
 			mProjectInitialized = false;
 		}
 		if (ImGui::MenuItem("Save Project"))
 		{
-
+			IGFD::FileDialogConfig config;
+			config.path = ".";
+			config.flags = ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ConfirmOverwrite;
+			ImGuiFileDialog::Instance()->OpenDialog("SavePrjFile", "Save Project File", ".json{.json, .JSON, .Json}", config);
 		}
+
 		if (ImGui::MenuItem("Export Level"))
 		{
 
@@ -252,6 +287,29 @@ void Application::RenderMainMenuBarUI()
 
 		ImGui::EndMenu();
 	}
+}
+
+void Application::LoadProjectDialog()
+{
+	IGFD::FileDialogConfig config;
+	config.path = ".";
+	config.flags = ImGuiFileDialogFlags_Modal;
+	ImGuiFileDialog::Instance()->OpenDialog("OpenPrjFile", "Open Project File", ".json{.json, .JSON, .Json}", config);
+}
+
+void Application::LoadProject()
+{
+	mProject = ImportExport::load(ImGuiFileDialog::Instance()->GetFilePathName()).value();
+	LoadProjectTextures();
+	AssignProjectTextures();
+	const sf::Texture* backgroundTexture = AssetManager::Get().GetTexture(mBackgroundTextureID);
+	if (backgroundTexture)
+	{
+		sf::Vector2f backgroundSize = sf::Vector2f(backgroundTexture->getSize());
+		mLevelView.setSize(backgroundSize);
+		mLevelView.setCenter(backgroundSize / 2.f);
+	}
+	mProjectInitialized = true;
 }
 
 void Application::RenderWizardUI()
@@ -280,13 +338,24 @@ void Application::RenderWizardUI()
 			if (ImGui::Button("New Project", { 200, 50 })) {
 				mWizardState = ProjectWizardState::CreateProject; // Cambia stato, non popup!
 			}
-			if (ImGui::Button("Load Project", { 200, 50 })) {}
+			if (ImGui::Button("Load Project", { 200, 50 })) {
+				LoadProjectDialog();
+			}
 			break;
 
 		case ProjectWizardState::CreateProject:
 			RenderCreateProject();
 			break;
 		}
+		if (ImGuiFileDialog::Instance()->Display("OpenPrjFile", ImGuiCond_Always, { 500.f, 300.f }))
+		{
+			if (ImGuiFileDialog::Instance()->IsOk())
+			{
+				LoadProject();
+			}
+			ImGuiFileDialog::Instance()->Close();
+		}
+
 		ImGui::EndPopup();
 	}
 }
@@ -302,23 +371,17 @@ void Application::RenderCreateProject()
 		ImGui::SameLine();
 		if (ImGui::Button("Browse Files"))
 		{
-			ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_Always);
-			ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, { 0.5f, 0.5f });
 			IGFD::FileDialogConfig config;
 			config.path = ".";
 			config.flags = ImGuiFileDialogFlags_Modal;
 			ImGuiFileDialog::Instance()->OpenDialog("ChooseBGFileDlgKey", "Choose Level Texture", "Image Files{.png,.jpg,.jpeg,.PNG,.JPG,.JPEG}", config);
 		}
-		if (ImGuiFileDialog::Instance()->Display("ChooseBGFileDlgKey", ImGuiWindowFlags_Modal))
+		if (ImGuiFileDialog::Instance()->Display("ChooseBGFileDlgKey", ImGuiCond_Always, {500.f, 300.f}))
 		{
-			// Se l'utente ha premuto "Ok"
 			if (ImGuiFileDialog::Instance()->IsOk())
 			{
-				// Ottieni il percorso del file selezionato
 				mTempSetupProject.backgroundTexturePath = ImGuiFileDialog::Instance()->GetFilePathName();
 			}
-
-			// Chiudi il dialog
 			ImGuiFileDialog::Instance()->Close();
 		}
 	}
@@ -331,33 +394,27 @@ void Application::RenderCreateProject()
 		ImGui::SameLine();
 		if (ImGui::Button("Browse Files##Hitbox"))
 		{
-			ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_Always);
-			ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, { 0.5f, 0.5f });
 			IGFD::FileDialogConfig config;
 			config.path = ".";
 			config.flags = ImGuiFileDialogFlags_Modal;
 			ImGuiFileDialog::Instance()->OpenDialog("ChooseHBFileDlgKey", "Choose Hitbox Texture Map", ".png{.png,.PNG}", config);
 		}
-		if (ImGuiFileDialog::Instance()->Display("ChooseHBFileDlgKey", ImGuiWindowFlags_Modal))
+		if (ImGuiFileDialog::Instance()->Display("ChooseHBFileDlgKey", ImGuiCond_Always, { 500.f, 300.f }))
 		{
-			// Se l'utente ha premuto "Ok"
 			if (ImGuiFileDialog::Instance()->IsOk())
 			{
-				// Ottieni il percorso del file selezionato
 				mTempSetupProject.hitboxTexturePath = ImGuiFileDialog::Instance()->GetFilePathName();
 			}
-
-			// Chiudi il dialog
 			ImGuiFileDialog::Instance()->Close();
 		}
 	}
 	{
 		ImGui::Checkbox("Enable Hitbox Creation (Black and White PNG)     ", &mTempSetupProject.bHitboxMap);
 		ImGui::SameLine();
-		ImGui::AlignTextToFramePadding(); // Allinea il testo verticalmente con lo slider
+		ImGui::AlignTextToFramePadding();
 		ImGui::Text("Hitbox Simplification:");
 		ImGui::SameLine();
-		ImGui::PushItemWidth(147.7f); // Diamo una larghezza fissa allo slider
+		ImGui::PushItemWidth(147.7f);
 		ImGui::SliderInt("##hitbox_simplification", &mTempSetupProject.simplifyIndex, 0, 30);
 		ImGui::PopItemWidth();
 	}
@@ -495,7 +552,7 @@ bool Application::ProjectInitialization()
 			const sf::Texture* texture = AssetManager::Get().GetTexture(object->assetID);
 			if (texture)
 			{
-				object->sprite.setTexture(*texture, true);
+				object->sprite->setTexture(*texture, true);
 			}
 			it++;
 		}
@@ -558,11 +615,11 @@ void Application::RenderLevelCanvasUI()
 			if (gameObjectTexture)
 			{
 				sf::Sprite gameObjectSprite(*gameObjectTexture);
-				GameObject newObject(nameID, gameObjectSprite);
-				newObject.sprite.setPosition(levelMousePos);
-				newObject.sprite.setScale(asset->defaultScale);
-				newObject.sprite.setRotation(asset->defaultRotation);
-				newObject.sprite.setOrigin(sf::Vector2f{ gameObjectTexture->getSize().x / 2.f, gameObjectTexture->getSize().y / 2.f });
+				GameObject newObject{ nameID, gameObjectSprite };
+				newObject.sprite->setPosition(levelMousePos);
+				newObject.sprite->setScale(asset->defaultScale);
+				newObject.sprite->setRotation(asset->defaultRotation);
+				newObject.sprite->setOrigin(sf::Vector2f{ gameObjectTexture->getSize().x / 2.f, gameObjectTexture->getSize().y / 2.f });
 				mProject.level.gameObjects.push_back(std::make_unique<GameObject>(newObject));
 				mSelectedGameObject = mProject.level.gameObjects.back().get();
 			}
@@ -577,7 +634,7 @@ void Application::RenderLevelCanvasUI()
 			List<unique<GameObject>>& gameObjects = mProject.level.gameObjects;
 			for (auto object = gameObjects.rbegin(); object != gameObjects.rend(); ++object)
 			{
-				if (object->get()->sprite.getGlobalBounds().contains(levelMousePos))
+				if (object->get()->sprite->getGlobalBounds().contains(levelMousePos))
 				{
 					mSelectedGameObject = object->get();
 					mSelectedAssetID.reset();
@@ -599,7 +656,7 @@ void Application::RenderLevelCanvasUI()
 			sf::Vector2f currentMousePosWorld = mLevelCanvas.mapPixelToCoords(currentMousePosPixel, mLevelView);
 			sf::Vector2f prevMousePosWorld = mLevelCanvas.mapPixelToCoords(prevMousePosPixel, mLevelView);
 			sf::Vector2f worldDelta = currentMousePosWorld - prevMousePosWorld;
-			mSelectedGameObject->sprite.move(worldDelta);
+			mSelectedGameObject->sprite->move(worldDelta);
 		}
 	}
 
@@ -624,10 +681,10 @@ void Application::RenderGameObjectPropertiesUI()
 		ImGui::Text("Position");
 		ImGui::Text("x:");
 		ImGui::SameLine();
-		sf::Vector2f position = mSelectedGameObject->sprite.getPosition();
+		sf::Vector2f position = mSelectedGameObject->sprite->getPosition();
 		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 2 - ImGui::GetStyle().ItemSpacing.x);
 		if (ImGui::InputFloat("##pos_x_input", &position.x)) {
-			mSelectedGameObject->sprite.setPosition(position);
+			mSelectedGameObject->sprite->setPosition(position);
 		}
 
 		ImGui::SameLine();
@@ -636,7 +693,7 @@ void Application::RenderGameObjectPropertiesUI()
 		ImGui::SameLine();
 		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x);
 		if (ImGui::InputFloat("##pos_y_input", &position.y)) {
-			mSelectedGameObject->sprite.setPosition(position);
+			mSelectedGameObject->sprite->setPosition(position);
 		}
 		ImGui::PopItemWidth();
 	}
@@ -646,15 +703,15 @@ void Application::RenderGameObjectPropertiesUI()
 	{
 		ImGui::Text("Scale");
 		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 2 - ImGui::GetStyle().ItemSpacing.x);
-		sf::Vector2f scale = mSelectedGameObject->sprite.getScale();
+		sf::Vector2f scale = mSelectedGameObject->sprite->getScale();
 		if (ImGui::InputFloat("##scale_input", &scale.x)) {
-			mSelectedGameObject->sprite.setScale({ scale.x,scale.x });
+			mSelectedGameObject->sprite->setScale({ scale.x,scale.x });
 		}
 		ImGui::PopItemWidth();
 		ImGui::SameLine();
 		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x);
 		if (ImGui::SliderFloat("##scale_slider", &scale.x, 0.f, 10.f)) {
-			mSelectedGameObject->sprite.setScale({ scale.x,scale.x });
+			mSelectedGameObject->sprite->setScale({ scale.x,scale.x });
 		}
 	}
 
@@ -662,25 +719,25 @@ void Application::RenderGameObjectPropertiesUI()
 
 	{
 		ImGui::Text("Rotation");
-		float rotation = mSelectedGameObject->sprite.getRotation().asDegrees();
+		float rotation = mSelectedGameObject->sprite->getRotation().asDegrees();
 		if (rotation > 180.f)
 		{
 			rotation -= 360.f;
 		}
 		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x / 2 - ImGui::GetStyle().ItemSpacing.x);
 		if (ImGui::InputFloat("##rot_input", &rotation)) {
-			mSelectedGameObject->sprite.setRotation(sf::degrees(rotation));
+			mSelectedGameObject->sprite->setRotation(sf::degrees(rotation));
 		}
 		ImGui::PopItemWidth();
 		ImGui::SameLine();
-		float rotationRad = mSelectedGameObject->sprite.getRotation().asRadians();
+		float rotationRad = mSelectedGameObject->sprite->getRotation().asRadians();
 		if (rotationRad > PI)
 		{
 			rotationRad -= 2 * PI;
 		}
 		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x);
 		if (ImGui::SliderAngle("##rot_slider", &rotationRad, -180.f, 180.f)) {
-			mSelectedGameObject->sprite.setRotation(sf::radians(rotationRad));
+			mSelectedGameObject->sprite->setRotation(sf::radians(rotationRad));
 		}
 		ImGui::PopItemWidth();
 	}
@@ -723,7 +780,7 @@ void Application::RenderAssetPropertiesUI()
 				GameObject* gameObject = gameObjectUnique.get();
 				if (gameObject->assetID == mSelectedAssetID)
 				{
-					gameObject->sprite.setScale(asset->defaultScale);
+					gameObject->sprite->setScale(asset->defaultScale);
 				}
 			}
 			
@@ -763,7 +820,7 @@ void Application::RenderAssetPropertiesUI()
 				GameObject* gameObject = gameObjectUnique.get();
 				if (gameObject->assetID == mSelectedAssetID)
 				{
-					gameObject->sprite.setRotation(asset->defaultRotation);
+					gameObject->sprite->setRotation(asset->defaultRotation);
 				}
 			}
 
@@ -885,5 +942,14 @@ void Application::LoadProjectTextures()
 		AssetManager::Get().LoadTexture(assetPair.first, assetPair.second.get()->texturePath);
 	}
 	AssetManager::Get().LoadTexture(mBackgroundTextureID, mProject.backgroundTexturePath);
+}
+
+void Application::AssignProjectTextures()
+{
+	for (unique<GameObject>& objectPtr : mProject.level.gameObjects)
+	{
+		const sf::Texture* texture = AssetManager::Get().GetTexture(objectPtr->assetID);
+		objectPtr->sprite.value().setTexture(*texture, true);
+	}
 }
 

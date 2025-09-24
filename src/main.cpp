@@ -3,7 +3,7 @@
 
 int main()
 {
-	Application app;
+	vle::Application app;
 	app.Run();
 	return 0;
 }
