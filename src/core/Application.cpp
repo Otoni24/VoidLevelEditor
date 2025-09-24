@@ -150,6 +150,14 @@ void Application::RenderUI(sf::Time deltaTime)
 		}
 		ImGuiFileDialog::Instance()->Close();
 	}
+	if (ImGuiFileDialog::Instance()->Display("ExportLevelFile", ImGuiCond_Always, { 500.f, 300.f }))
+	{
+		if (ImGuiFileDialog::Instance()->IsOk())
+		{
+			ImportExport::exportLevel(mProject.level, ImGuiFileDialog::Instance()->GetFilePathName());
+		}
+		ImGuiFileDialog::Instance()->Close();
+	}
 
 }
 
@@ -276,7 +284,10 @@ void Application::RenderMainMenuBarUI()
 
 		if (ImGui::MenuItem("Export Level"))
 		{
-
+			IGFD::FileDialogConfig config;
+			config.path = ".";
+			config.flags = ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ConfirmOverwrite;
+			ImGuiFileDialog::Instance()->OpenDialog("ExportLevelFile", "Export Level File", ".json{.json, .JSON, .Json}", config);
 		}
 		ImGui::EndMenu();
 	}
@@ -526,6 +537,7 @@ bool Application::ProjectInitialization()
 		}
 		mMissingHitboxPath = false;
 		List<Vectorizer::Math::Chain> chains = Vectorizer::vectorizeImage(mTempSetupProject.hitboxTexturePath, mTempSetupProject.simplifyIndex);
+		mTempSetupProject.level.hitboxMap.clear();
 		for (Vectorizer::Math::Chain chain : chains)
 		{
 			sf::VertexArray newChain(sf::PrimitiveType::LineStrip);

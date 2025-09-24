@@ -48,5 +48,18 @@ std::optional<Project> ImportExport::load(const std::string& path)
         std::cerr << "JSON Conversion Error:" << e.what() << std::endl;
         return std::nullopt;
     }
+}
 
+bool ImportExport::exportLevel(const Level& level, const std::string& path)
+{
+    std::ofstream fileStream(path);
+    if (!fileStream.is_open())
+    {
+        std::cerr << "Error: output file invalid" << path << std::endl;
+        return false;
+    }
+    json levelJson = level;
+    fileStream << levelJson.dump(4);
+    fileStream.close();
+    return true;
 }
