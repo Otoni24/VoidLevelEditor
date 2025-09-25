@@ -3,7 +3,6 @@ project(VoidLevelEditor LANGUAGES CXX)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-
 include(FetchContent)
 FetchContent_Declare(
     VectorizerLib
@@ -11,7 +10,7 @@ FetchContent_Declare(
     GIT_TAG "master"
     GIT_SHALLOW ON
 )
-set(VEC_IMPLEMENT_STB_IMAGE OFF)
+set(VEC_IMPLEMENT_STB_IMAGE OFF CACHE BOOL "Let VectorizerLib provide the stb_image implementation" FORCE)
 FetchContent_MakeAvailable(VectorizerLib)
 
 FetchContent_Declare(SFML
@@ -45,7 +44,6 @@ FetchContent_Declare(nlohmann_json
 FetchContent_MakeAvailable(nlohmann_json)
 
 add_executable(VoidLevelEditor
-    
     "src/main.cpp"
     "src/core/Application.cpp"
     "src/io/ImportExport.cpp"

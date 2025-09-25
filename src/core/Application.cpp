@@ -28,6 +28,7 @@ Application::Application()
 	mWindow.setVerticalSyncEnabled(true);
 	ImGui::SFML::Init(mWindow);
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+	ImGui::GetIO().IniFilename = NULL;
 }
 
 Application::~Application()
@@ -161,29 +162,6 @@ void Application::RenderUI(sf::Time deltaTime)
 
 }
 
-void Application::SetupDefaultDockingLayout(ImGuiID nodeID)
-{
-
-	ImGui::DockBuilderRemoveNode(nodeID);
-	ImGui::DockBuilderAddNode(nodeID, ImGuiDockNodeFlags_DockSpace);
-	ImGui::DockBuilderSetNodeSize(nodeID, ImGui::GetMainViewport()->Size);
-
-	ImGuiID dock_main_id = nodeID;
-	ImGuiID dock_bottom_id;
-	ImGuiID dock_right_id;
-	ImGuiID dock_right_bottom_id;
-	ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.3f, &dock_right_id, &dock_main_id);
-	ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.3f, &dock_bottom_id, &dock_main_id);
-	ImGui::DockBuilderSplitNode(dock_right_id, ImGuiDir_Down, 0.5f, &dock_right_bottom_id, &dock_right_id);
-
-	ImGui::DockBuilderDockWindow("Asset Library", dock_bottom_id);
-	ImGui::DockBuilderDockWindow("Game Objects", dock_right_id);
-	ImGui::DockBuilderDockWindow("Level Viewport", dock_main_id);
-	ImGui::DockBuilderDockWindow("Properties", dock_right_bottom_id);
-
-	ImGui::DockBuilderFinish(nodeID);
- }
-
 void Application::RenderEditorUI()
 {
 	ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
@@ -209,7 +187,6 @@ void Application::RenderEditorUI()
 	ImGui::PopStyleVar(3);
 
 	ImGuiID dockspaceID = ImGui::GetID("MyDockSpace");
-
 	if (mIsFirstFrame) SetupDefaultDockingLayout(dockspaceID);
 	ImGui::DockSpace(dockspaceID, ImVec2(0.0f, 0.0f));
 
@@ -239,6 +216,29 @@ void Application::RenderEditorUI()
 
 	ImGui::End();
 }
+
+void Application::SetupDefaultDockingLayout(ImGuiID nodeID)
+{
+
+	ImGui::DockBuilderRemoveNode(nodeID);
+	ImGui::DockBuilderAddNode(nodeID, ImGuiDockNodeFlags_DockSpace);
+	ImGui::DockBuilderSetNodeSize(nodeID, ImGui::GetMainViewport()->Size);
+
+	ImGuiID dock_main_id = nodeID;
+	ImGuiID dock_bottom_id;
+	ImGuiID dock_right_id;
+	ImGuiID dock_right_bottom_id;
+	ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.3f, &dock_right_id, &dock_main_id);
+	ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.3f, &dock_bottom_id, &dock_main_id);
+	ImGui::DockBuilderSplitNode(dock_right_id, ImGuiDir_Down, 0.5f, &dock_right_bottom_id, &dock_right_id);
+
+	ImGui::DockBuilderDockWindow("Asset Library", dock_bottom_id);
+	ImGui::DockBuilderDockWindow("Game Objects", dock_right_id);
+	ImGui::DockBuilderDockWindow("Level Viewport", dock_main_id);
+	ImGui::DockBuilderDockWindow("Properties", dock_right_bottom_id);
+
+	ImGui::DockBuilderFinish(nodeID);
+ }
 
 void Application::RenderMainMenuBarUI()
 {
@@ -581,33 +581,37 @@ bool Application::ProjectInitialization()
 
 void Application::RenderLevelCanvasUI()
 {
-	sf::Vector2u newCanvasSize = ImGui::GetContentRegionAvail();
+	ImVec2 newCanvasSize = ImGui::GetContentRegionAvail();
 
-	if (mLevelCanvas.getSize() != newCanvasSize)
+	if (newCanvasSize.x > 0 && newCanvasSize.y > 0)
 	{
-		mLevelCanvas.resize(newCanvasSize);
-	}
+		sf::Vector2u sfNewCanvasSize = sf::Vector2u(newCanvasSize);
+		if (mLevelCanvas.getSize() != sfNewCanvasSize)
+		{
+			mLevelCanvas.resize(sfNewCanvasSize);
 
-	sf::Vector2f viewSize = mLevelView.getSize();
-	float windowRatio = (float)newCanvasSize.x / (float)newCanvasSize.y;
-	float viewRatio = viewSize.x / viewSize.y;
+			sf::Vector2f viewSize = mLevelView.getSize();
+			float windowRatio = (float)newCanvasSize.x / (float)newCanvasSize.y;
+			float viewRatio = viewSize.x / viewSize.y;
 
-	float sizeX = 1.0f;
-	float sizeY = 1.0f;
-	float posX = 0.0f;
-	float posY = 0.0f;
+			float sizeX = 1.0f;
+			float sizeY = 1.0f;
+			float posX = 0.0f;
+			float posY = 0.0f;
 
-	if (windowRatio > viewRatio)
-	{
-		sizeX = viewRatio / windowRatio;
-		posX = (1.0f - sizeX) / 2.0f;
+			if (windowRatio > viewRatio)
+			{
+				sizeX = viewRatio / windowRatio;
+				posX = (1.0f - sizeX) / 2.0f;
+			}
+			else
+			{
+				sizeY = windowRatio / viewRatio;
+				posY = (1.0f - sizeY) / 2.0f;
+			}
+			mLevelView.setViewport(sf::FloatRect({ posX, posY }, { sizeX, sizeY }));
+		}
 	}
-	else
-	{
-		sizeY = windowRatio / viewRatio;
-		posY = (1.0f - sizeY) / 2.0f;
-	}
-	mLevelView.setViewport(sf::FloatRect({ posX, posY }, { sizeX, sizeY }));
 
 	ImGui::Image(mLevelCanvas);
 
@@ -964,4 +968,3 @@ void Application::AssignProjectTextures()
 		objectPtr->sprite.value().setTexture(*texture, true);
 	}
 }
-
