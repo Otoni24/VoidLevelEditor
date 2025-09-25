@@ -7,7 +7,7 @@ namespace vle {
 	{
 		std::string name;
 		std::string texturePath;
-		sf::Vector2f defaultScale;
+		sf::Vector2f defaultScale = { 1.0f, 1.0f };
 		sf::Angle defaultRotation;
 	};
 	struct Asset

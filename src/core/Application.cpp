@@ -85,7 +85,7 @@ void Application::RenderScene()
 	{
 		if (gameObject->sprite.has_value())
 		{
-			mLevelCanvas.draw(gameObject->sprite.value());
+			mLevelCanvas.draw(*gameObject->sprite);
 		}
 	}
 	if (mSelectedGameObject != nullptr)
@@ -164,7 +164,7 @@ void Application::RenderUI(sf::Time deltaTime)
 
 void Application::RenderEditorUI()
 {
-	ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+	ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking;
 	window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
 	window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
 
@@ -176,12 +176,6 @@ void Application::RenderEditorUI()
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 
-	ImGui::BeginMainMenuBar();
-
-	RenderMainMenuBarUI();
-
-	ImGui::EndMainMenuBar();
-
 	ImGui::Begin("DockSpace Host", nullptr, window_flags);
 
 	ImGui::PopStyleVar(3);
@@ -191,6 +185,12 @@ void Application::RenderEditorUI()
 	ImGui::DockSpace(dockspaceID, ImVec2(0.0f, 0.0f));
 
 	ImGui::End();
+
+	ImGui::BeginMainMenuBar();
+
+	RenderMainMenuBarUI();
+
+	ImGui::EndMainMenuBar();
 
 	ImGui::Begin("Level Viewport");
 
@@ -311,6 +311,8 @@ void Application::LoadProjectDialog()
 void Application::LoadProject()
 {
 	mProject = ImportExport::load(ImGuiFileDialog::Instance()->GetFilePathName()).value();
+	mSelectedAssetID.reset();
+	mSelectedGameObject = nullptr;
 	LoadProjectTextures();
 	AssignProjectTextures();
 	const sf::Texture* backgroundTexture = AssetManager::Get().GetTexture(mBackgroundTextureID);
