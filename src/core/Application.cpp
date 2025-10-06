@@ -264,6 +264,7 @@ void Application::RenderMainMenuBarUI()
 			mSelectedGameObject = nullptr;
 			mTempAssetList.clear();
 			mTempSetupProject = std::move(mProject);
+			mTempSetupProject.level.hitboxMap.clear();
 			for (const auto& pair : mTempSetupProject.assets) {
 				if (pair.second) {
 					const Asset& asset = *pair.second;
