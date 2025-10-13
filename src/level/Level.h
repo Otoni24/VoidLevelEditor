@@ -7,6 +7,7 @@
 namespace vle {
 	struct Level
 	{
+		std::string levelNameId;
 		List<sf::VertexArray> hitboxMap;
 		List<unique<GameObject>> gameObjects;
 		void addGameObject(unique<GameObject> object)

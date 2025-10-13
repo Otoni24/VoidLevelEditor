@@ -160,12 +160,14 @@ namespace vle {
 	void to_json(nlohmann::json& j, const Level& level)
 	{
 		j = nlohmann::json{
+			{"levelNameId", level.levelNameId},
 			{"hitboxMap", level.hitboxMap},
 			{"gameObjects", level.gameObjects}
 		};
 	}
 	void from_json(const nlohmann::json& j, Level& level)
 	{
+		j.at("levelNameId").get_to(level.levelNameId);
 		j.at("hitboxMap").get_to(level.hitboxMap);
 		j.at("gameObjects").get_to(level.gameObjects);
 	}

@@ -10,6 +10,8 @@ using namespace vle;
 
 Application::Application()
 	: mWindow{ sf::VideoMode({1000, 680}), "Level Editor", sf::Style::Default },
+	mDraggingObject{ false },
+	mEditingProject{ false },
 	mTickClock{},
 	mCleanCycleClock{},
 	mCleanCycleInterval{},
@@ -155,6 +157,18 @@ void Application::RenderUI(sf::Time deltaTime)
 	{
 		if (ImGuiFileDialog::Instance()->IsOk())
 		{
+			List<sf::VertexArray> hitboxMap = mProject.level.hitboxMap;
+			if (!mProject.bHitboxCreateLoop)
+			{
+				for (sf::VertexArray& chain : hitboxMap)
+				{
+					if (chain.getVertexCount() > 0)
+					{
+						chain.resize(chain.getVertexCount() - 1);
+					}
+				}
+				mProject.level.hitboxMap = hitboxMap;
+			}
 			ImportExport::exportLevel(mProject.level, ImGuiFileDialog::Instance()->GetFilePathName());
 		}
 		ImGuiFileDialog::Instance()->Close();
@@ -338,7 +352,7 @@ void Application::RenderWizardUI()
 		ImGui::SetNextWindowSize(ImVec2(200 + ImGui::GetStyle().ItemSpacing.x * 2, 140), ImGuiCond_Always);
 		break;
 	case ProjectWizardState::CreateProject:
-		ImGui::SetNextWindowSize(ImVec2(800, 445), ImGuiCond_Always);
+		ImGui::SetNextWindowSize(ImVec2(800, 480), ImGuiCond_Always);
 		break;
 	}
 	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, { 0.5f, 0.5f });
@@ -376,6 +390,14 @@ void Application::RenderWizardUI()
 
 void Application::RenderCreateProject()
 {
+	ImGui::Text("Level Name ID:");
+	{
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
+		ImGui::InputTextWithHint("##level_name_id", "Level Name ID", &mTempSetupProject.level.levelNameId);
+		ImGui::PopItemWidth();
+		ImGui::SameLine();
+	}
+	ImGui::Separator();
 	ImGui::Text("Level Texture:");
 	float buttonWidth = ImGui::CalcTextSize("Browse Files").x + ImGui::GetStyle().FramePadding.x * 2.0f;
 	{
@@ -423,12 +445,14 @@ void Application::RenderCreateProject()
 		}
 	}
 	{
-		ImGui::Checkbox("Enable Hitbox Creation (Black and White PNG)     ", &mTempSetupProject.bHitboxMap);
+		ImGui::Checkbox("Enable Hitbox Creation (B&W PNG)   ", &mTempSetupProject.bHitboxMap);
 		ImGui::SameLine();
+		ImGui::Checkbox("Create Loop   ", &mTempSetupProject.bHitboxCreateLoop);
 		ImGui::AlignTextToFramePadding();
+		ImGui::SameLine();
 		ImGui::Text("Hitbox Simplification:");
 		ImGui::SameLine();
-		ImGui::PushItemWidth(147.7f);
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x);
 		ImGui::SliderInt("##hitbox_simplification", &mTempSetupProject.simplifyIndex, 0, 30);
 		ImGui::PopItemWidth();
 	}

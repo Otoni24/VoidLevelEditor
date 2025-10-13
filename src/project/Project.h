@@ -15,10 +15,12 @@ namespace vle {
 		std::string hitboxTexturePath;
 		int simplifyIndex;
 		bool bHitboxMap;
+		bool bHitboxCreateLoop;
 		Map<std::string, unique<Asset>> assets;
 		Project()
 			: simplifyIndex{ 3 },
-			bHitboxMap{ false }
+			bHitboxMap{ false },
+			bHitboxCreateLoop{ false }
 		{
 		}
 		Project(const Project&) = delete;
