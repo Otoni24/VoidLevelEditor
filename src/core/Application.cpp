@@ -592,6 +592,7 @@ bool Application::ProjectInitialization()
 			if (texture)
 			{
 				object->sprite->setTexture(*texture, true);
+				object->sprite->setOrigin(sf::Vector2f{ texture->getSize().x / 2.f, texture->getSize().y / 2.f });
 			}
 			it++;
 		}
