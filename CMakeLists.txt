@@ -55,6 +55,11 @@ add_executable(VoidLevelEditor WIN32
     "lib/ImGuiFileDialog/ImGuiFileDialog.cpp"
  )
 
+ target_include_directories(VoidLevelEditor PRIVATE
+	${CMAKE_CURRENT_SOURCE_DIR}/src
+	${CMAKE_CURRENT_SOURCE_DIR}/lib
+)
+
 target_include_directories(VoidLevelEditor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/lib/ImGuiFileDialog)
 target_compile_features(VoidLevelEditor PRIVATE cxx_std_17)
 target_link_libraries(VoidLevelEditor PRIVATE VectorizerLib SFML::Graphics SFML::Main ImGui-SFML::ImGui-SFML nlohmann_json::nlohmann_json)
