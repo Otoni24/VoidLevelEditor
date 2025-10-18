@@ -47,19 +47,28 @@ FetchContent_Declare(nlohmann_json
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
+add_library(ImGuiFileDialog STATIC
+    "lib/ImGuiFileDialog/ImGuiFileDialog.cpp"
+    "lib/ImGuiFileDialog/ImGuiFileDialog.h"
+)
+
+target_include_directories(ImGuiFileDialog PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/lib/ImGuiFileDialog
+)
+
+target_link_libraries(ImGuiFileDialog PRIVATE ImGui-SFML::ImGui-SFML)
+
 add_executable(VoidLevelEditor WIN32
     "src/main.cpp"
     "src/core/Application.cpp"
     "src/io/ImportExport.cpp"
     "src/project/AssetManager.cpp"
-    "lib/ImGuiFileDialog/ImGuiFileDialog.cpp"
  )
 
  target_include_directories(VoidLevelEditor PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/src
-	${CMAKE_CURRENT_SOURCE_DIR}/lib
 )
 
 target_include_directories(VoidLevelEditor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/lib/ImGuiFileDialog)
 target_compile_features(VoidLevelEditor PRIVATE cxx_std_17)
-target_link_libraries(VoidLevelEditor PRIVATE VectorizerLib SFML::Graphics SFML::Main ImGui-SFML::ImGui-SFML nlohmann_json::nlohmann_json)
+target_link_libraries(VoidLevelEditor PRIVATE VectorizerLib SFML::Graphics SFML::Main ImGui-SFML::ImGui-SFML nlohmann_json::nlohmann_json ImGuiFileDialog)
